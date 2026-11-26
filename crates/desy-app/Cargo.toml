@@ -12,7 +12,7 @@ gpui-kit.workspace = true
 kurbo.workspace = true
 ureq = "3"
 # Same version as GPUI's, to rasterize PNG/JPG exports from the SVG export.
-resvg = { version = "0.46", default-features = false, features = ["raster-images"] }
+resvg = { version = "0.50", default-features = false, features = ["raster-images"] }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
 anyhow.workspace = true
 serde_json.workspace = true
