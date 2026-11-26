@@ -1,0 +1,25 @@
+name: Bug
+description: Quelque chose ne fonctionne pas comme prévu
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: Que se passe-t-il ?
+      description: Étapes pour reproduire, résultat attendu et résultat obtenu.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version de Desy
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Système
+      options: [macOS (Apple Silicon), macOS (Intel), Linux, Windows]
+    validations:
+      required: true

@@ -1,0 +1,11 @@
+name: Idée de fonctionnalité
+description: Proposer une amélioration
+labels: [enhancement]
+body:
+  - type: textarea
+    id: idea
+    attributes:
+      label: Ton idée
+      description: Quel problème cela résout-il ? Comment l'imagines-tu dans Desy ?
+    validations:
+      required: true
