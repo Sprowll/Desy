@@ -140,7 +140,7 @@ Application macOS avec son icône : `cargo install cargo-bundle` puis `cargo bun
 cargo test --workspace               # tests (réseau Google Fonts : cargo test -p desy -- --ignored)
 cargo clippy --workspace --all-targets
 cargo fmt --all --check
-cargo deny check                     # vulnérabilités et licences des dépendances
+cargo deny --all-features check      # vulnérabilités et licences des dépendances
 ```
 
 Capture de l'interface sans écran (développement) :

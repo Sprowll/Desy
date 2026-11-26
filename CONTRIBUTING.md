@@ -16,7 +16,7 @@ Merci de ton intérêt ! Quelques règles pour que tout se passe bien.
    cargo fmt --all
    cargo clippy --workspace --all-targets -- -D warnings
    cargo test --workspace
-   cargo deny check
+   cargo deny --all-features check
    ```
 4. Ajoute des tests pour la logique (`desy-core`, `editor.rs`).
 5. Messages de commit au format [Conventional Commits](https://www.conventionalcommits.org/fr/) (`feat:`, `fix:`, `docs:`, `chore:`…) : ils servent à rédiger les notes de version.
