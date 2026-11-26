@@ -15,4 +15,4 @@ uuid.workspace = true
 fontdb.workspace = true
 ttf-parser.workspace = true
 anyhow.workspace = true
-base64 = "0.22"
+base64 = "0.23"
