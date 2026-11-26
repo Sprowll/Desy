@@ -1,0 +1,36 @@
+[package]
+name = "desy"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+desy-core.workspace = true
+gpui-kit.workspace = true
+kurbo.workspace = true
+ureq = "3"
+# Same version as GPUI's, to rasterize PNG/JPG exports from the SVG export.
+resvg = { version = "0.46", default-features = false, features = ["raster-images"] }
+image = { version = "0.25", default-features = false, features = ["png", "jpeg", "webp", "gif", "bmp"] }
+anyhow.workspace = true
+serde_json.workspace = true
+serde.workspace = true
+
+# Dock icon when running outside an app bundle (`cargo run`).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSApplication", "NSImage", "NSResponder"] }
+objc2-foundation = { version = "0.3", default-features = false, features = ["std", "NSData"] }
+
+[features]
+# Development only: render the window to a PNG (`DESY_SHOT=out.png`) for visual checks.
+dev-screenshot = ["gpui-kit/test-support"]
+
+# `cargo bundle --release` builds Desy.app with the app icon.
+[package.metadata.bundle]
+name = "Desy"
+identifier = "app.desy.Desy"
+icon = ["../../assets/icon.icns", "../../assets/icon.png"]
+category = "public.app-category.graphics-design"

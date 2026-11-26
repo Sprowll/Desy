@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Desy
+GenericName=Vector Graphics Editor
+Comment=Logos, mascottes et formes vectorielles
+Exec=desy
+Icon=desy
+Terminal=false
+Categories=Graphics;VectorGraphics;
