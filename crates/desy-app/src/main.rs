@@ -16,6 +16,7 @@ mod fill_popover;
 mod fonts;
 mod icons;
 mod images;
+mod motion;
 mod paint;
 mod palette_panel;
 mod panels;

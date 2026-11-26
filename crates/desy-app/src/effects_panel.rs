@@ -4,6 +4,7 @@
 use crate::color_field::FieldLook;
 use crate::editor::Editor;
 use crate::icons::{Icon, icon};
+use crate::motion::{Enter, From};
 use crate::panels::chip;
 use crate::theme;
 use crate::view::EditorView;
@@ -517,7 +518,7 @@ impl EditorView {
                 });
             })
             .trigger(AddTrigger { open })
-            .when(open, |p| p.child(self.effects_menu_grid(cx)));
+            .when(open, |p| p.child(Enter::content().wrap("fx-add-enter", self.effects_menu_grid(cx))));
         let header = h_flex()
             .h(px(44.0))
             .flex_none()
@@ -532,26 +533,26 @@ impl EditorView {
         stack = stack.children(self.mirror_card(cx));
         let n = effects.len();
         for (idx, e) in effects.iter().enumerate() {
-            stack = stack.child(self.effect_card(idx, n, e, window, cx));
+            // A new effect drops into the stack.
+            let card = self.effect_card(idx, n, e, window, cx);
+            stack = stack.child(Enter::content().wrap(("fx-card-enter", idx * 256 + kind_id(&e.kind) as usize), card));
         }
-        Some(
-            v_flex()
-                .occlude()
-                .absolute()
-                .left(px(left))
-                .bottom(px(crate::view::M))
-                .w(px(EFFECTS_W))
-                .max_h(px(max_h))
-                .overflow_hidden()
-                .rounded(px(theme::RADIUS_PANEL))
-                .bg(theme::panel())
-                .border_1()
-                .border_color(theme::border())
-                .shadow_lg()
-                .child(header)
-                .child(div().id("fx-scroll").flex_shrink(1.0).min_h_0().overflow_y_scroll().child(stack))
-                .into_any_element(),
-        )
+        let surface = v_flex()
+            .occlude()
+            .absolute()
+            .left(px(left))
+            .bottom(px(crate::view::M))
+            .w(px(EFFECTS_W))
+            .max_h(px(max_h))
+            .overflow_hidden()
+            .rounded(px(theme::RADIUS_PANEL))
+            .bg(theme::panel())
+            .border_1()
+            .border_color(theme::border())
+            .shadow_lg()
+            .child(header)
+            .child(div().id("fx-scroll").flex_shrink(1.0).min_h_0().overflow_y_scroll().child(stack));
+        Some(Enter::card(From::Below).run("fx-window-enter", surface).into_any_element())
     }
 
     /// Effects window (left, width, max height), right of the layers.

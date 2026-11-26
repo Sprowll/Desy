@@ -587,7 +587,7 @@ impl EditorView {
 
     /// Side panel: the inspector as separate floating cards (scrolling
     /// together), the palette pinned at the bottom.
-    pub fn right_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    pub fn right_panel(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let cards = self.inspector_cards(window, cx);
         v_flex()
             .absolute()

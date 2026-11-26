@@ -4,6 +4,7 @@ use crate::actions::*;
 use crate::editor::{Align, Drag, Editor, Tool};
 use crate::export::Format;
 use crate::icons::{Icon, icon};
+use crate::motion::{self, Enter, From};
 use crate::panels::Props;
 use crate::tool_frames::FRAME_W;
 use crate::{projects, theme};
@@ -344,7 +345,7 @@ impl EditorView {
     // The canvas fills the window; the tools, the title, the actions and the
     // panels float over it as Material 3 surfaces.
 
-    fn top_bar(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn top_bar(&self, cx: &mut Context<Self>) -> Div {
         h_flex()
             .absolute()
             .top(px(M))
@@ -427,7 +428,7 @@ impl EditorView {
 
     /// View controls at the bottom right, next to the side panel: snapping,
     /// zoom and fit.
-    fn view_pill(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn view_pill(&self, cx: &mut Context<Self>) -> Div {
         floating()
             .absolute()
             .right(px(M + PANEL_W + 8.0))
@@ -556,22 +557,29 @@ impl EditorView {
                 _ => size.clone().into(),
             };
             menu = menu.child(
-                h_flex()
-                    .id(("export-item", i))
-                    .h(px(40.0))
-                    .px_3()
-                    .gap_3()
-                    .items_center()
-                    .rounded(px(10.0))
-                    .hover(|d| d.bg(theme::hover()))
-                    .active(|d| d.bg(theme::pressed()))
-                    .on_click(cx.listener(move |v, _, _, cx| {
-                        v.export_menu = false;
-                        v.export(format, cx);
-                    }))
-                    .child(icon(if format == Format::Svg { Icon::Pen } else { Icon::Image }, 18.0, theme::text_dim()))
-                    .child(div().flex_1().text_sm().font_weight(FontWeight::MEDIUM).child(format.label()))
-                    .child(div().text_xs().text_color(theme::text_faint()).child(detail)),
+                Enter::row(i).wrap(
+                    ("export-row", i),
+                    h_flex()
+                        .id(("export-item", i))
+                        .h(px(40.0))
+                        .px_3()
+                        .gap_3()
+                        .items_center()
+                        .rounded(px(10.0))
+                        .hover(|d| d.bg(theme::hover()))
+                        .active(|d| d.bg(theme::pressed()))
+                        .on_click(cx.listener(move |v, _, _, cx| {
+                            v.export_menu = false;
+                            v.export(format, cx);
+                        }))
+                        .child(icon(
+                            if format == Format::Svg { Icon::Pen } else { Icon::Image },
+                            18.0,
+                            theme::text_dim(),
+                        ))
+                        .child(div().flex_1().text_sm().font_weight(FontWeight::MEDIUM).child(format.label()))
+                        .child(div().text_xs().text_color(theme::text_faint()).child(detail)),
+                ),
             );
         }
         let close = |v: &mut EditorView, _: &MouseDownEvent, _: &mut Window, cx: &mut Context<EditorView>| {
@@ -594,13 +602,13 @@ impl EditorView {
                     .on_mouse_down(MouseButton::Left, cx.listener(close))
                     .on_mouse_down(MouseButton::Right, cx.listener(close)),
             )
-            .child(menu)
+            .child(Enter::menu(From::Above).run("export-menu-enter", menu))
             .into_any_element()
     }
 
     /// Vertical tool rail: one slot per group, the last used tool of the
     /// group is shown; click the active slot (or right-click) for the others.
-    fn tool_rail(&self, cx: &mut Context<Self>) -> impl IntoElement {
+    fn tool_rail(&self, cx: &mut Context<Self>) -> Div {
         let current = self.ed.tool;
         let hint = self.tool_hint();
         let mut rail = floating()
@@ -621,58 +629,63 @@ impl EditorView {
             let open = self.tool_menu == Some(gi);
             let multi = group.len() > 1;
             let fg = if active { theme::on_active() } else { theme::text() };
-            rail = rail.child(
-                div()
-                    .id(("tool-slot", gi))
-                    .relative()
-                    .size(px(SLOT))
-                    .flex()
-                    .flex_none()
-                    .items_center()
-                    .justify_center()
-                    // Material 3 Expressive: the active item morphs from a
-                    // circle to a rounded square.
-                    .when(active, |d| d.rounded(px(theme::RADIUS_ITEM)).bg(theme::active()))
-                    .when(!active, |d| d.rounded_full().hover(|d| d.bg(theme::hover())))
-                    .when(open && !active, |d| d.bg(theme::pressed()))
-                    .when(!open, |d| {
-                        d.tooltip(move |window, cx| {
-                            let mut tip = tool.label().to_string();
-                            if active {
-                                // The active tool explains how to use it.
-                                tip = format!("{tip}\n{hint}");
-                                if multi {
-                                    tip.push_str("\nClic : les autres outils du groupe");
-                                }
+            let slot = div()
+                .id(("tool-slot", gi))
+                .relative()
+                .size(px(SLOT))
+                .flex()
+                .flex_none()
+                .items_center()
+                .justify_center()
+                // Material 3 Expressive: the active item morphs from a
+                // circle to a rounded square.
+                .when(active, |d| d.rounded(px(theme::RADIUS_ITEM)).bg(theme::active()))
+                .when(!active, |d| d.rounded_full().hover(|d| d.bg(theme::hover())))
+                .when(open && !active, |d| d.bg(theme::pressed()))
+                .when(!open, |d| {
+                    d.tooltip(move |window, cx| {
+                        let mut tip = tool.label().to_string();
+                        if active {
+                            // The active tool explains how to use it.
+                            tip = format!("{tip}\n{hint}");
+                            if multi {
+                                tip.push_str("\nClic : les autres outils du groupe");
                             }
-                            Tooltip::new(tip).build(window, cx)
-                        })
+                        }
+                        Tooltip::new(tip).build(window, cx)
                     })
-                    .on_click(cx.listener(move |v, _, window, cx| {
-                        if v.tool_menu == Some(gi) {
-                            v.tool_menu = None;
-                        } else if multi && v.ed.tool == tool {
-                            v.tool_menu = Some(gi);
-                        } else {
-                            v.ed.set_tool(tool);
-                            v.tool_menu = None;
-                        }
-                        window.focus(&v.canvas_focus, cx);
+                })
+                .on_click(cx.listener(move |v, _, window, cx| {
+                    if v.tool_menu == Some(gi) {
+                        v.tool_menu = None;
+                    } else if multi && v.ed.tool == tool {
+                        v.tool_menu = Some(gi);
+                    } else {
+                        v.ed.set_tool(tool);
+                        v.tool_menu = None;
+                    }
+                    window.focus(&v.canvas_focus, cx);
+                    cx.notify();
+                }))
+                .on_aux_click(cx.listener(move |v, ev: &ClickEvent, _, cx| {
+                    if multi && ev.is_right_click() {
+                        v.tool_menu = Some(gi);
                         cx.notify();
-                    }))
-                    .on_aux_click(cx.listener(move |v, ev: &ClickEvent, _, cx| {
-                        if multi && ev.is_right_click() {
-                            v.tool_menu = Some(gi);
-                            cx.notify();
-                        }
-                    }))
-                    .child(icon(tool.icon(), 20.0, fg))
-                    .when(multi, |d| {
-                        let mut c = fg;
-                        c.a *= 0.7;
-                        d.child(div().absolute().right(px(3.0)).bottom(px(3.0)).child(icon(Icon::Corner, 8.0, c)))
-                    }),
-            );
+                    }
+                }))
+                .child(icon(tool.icon(), 20.0, fg))
+                .when(multi, |d| {
+                    let mut c = fg;
+                    c.a *= 0.7;
+                    d.child(div().absolute().right(px(3.0)).bottom(px(3.0)).child(icon(Icon::Corner, 8.0, c)))
+                });
+            // The newly active slot morphs from its circle into the square.
+            rail = rail.child(if active {
+                motion::morph(("tool-slot-on", gi), slot, SLOT / 2.0, theme::RADIUS_ITEM, theme::active())
+                    .into_any_element()
+            } else {
+                slot.into_any_element()
+            });
         }
         rail
     }
@@ -700,37 +713,40 @@ impl EditorView {
             let on = t == current;
             let fg = if on { theme::on_active() } else { theme::text() };
             menu = menu.child(
-                h_flex()
-                    .id(("tool-item", i))
-                    .h(px(44.0))
-                    .px_3()
-                    .gap_3()
-                    .items_center()
-                    .rounded(px(theme::RADIUS_ITEM))
-                    .when(on, |d| d.bg(theme::active()))
-                    .when(!on, |d| d.hover(|d| d.bg(theme::hover())))
-                    .child(icon(t.icon(), 20.0, fg))
-                    .child(div().flex_1().text_sm().text_color(fg).child(t.name()))
-                    .child(
-                        div()
-                            .min_w(px(22.0))
-                            .px_1()
-                            .rounded(px(6.0))
-                            .flex()
-                            .justify_center()
-                            .text_xs()
-                            .font_weight(FontWeight::MEDIUM)
-                            .text_color(if on { theme::on_active() } else { theme::text_faint() })
-                            .border_1()
-                            .border_color(if on { theme::on_active().opacity(0.4) } else { theme::border() })
-                            .child(t.key()),
-                    )
-                    .on_click(cx.listener(move |v, _, window, cx| {
-                        v.ed.set_tool(t);
-                        v.tool_menu = None;
-                        window.focus(&v.canvas_focus, cx);
-                        cx.notify();
-                    })),
+                Enter::row(i).wrap(
+                    ("tool-row", i),
+                    h_flex()
+                        .id(("tool-item", i))
+                        .h(px(44.0))
+                        .px_3()
+                        .gap_3()
+                        .items_center()
+                        .rounded(px(theme::RADIUS_ITEM))
+                        .when(on, |d| d.bg(theme::active()))
+                        .when(!on, |d| d.hover(|d| d.bg(theme::hover())))
+                        .child(icon(t.icon(), 20.0, fg))
+                        .child(div().flex_1().text_sm().text_color(fg).child(t.name()))
+                        .child(
+                            div()
+                                .min_w(px(22.0))
+                                .px_1()
+                                .rounded(px(6.0))
+                                .flex()
+                                .justify_center()
+                                .text_xs()
+                                .font_weight(FontWeight::MEDIUM)
+                                .text_color(if on { theme::on_active() } else { theme::text_faint() })
+                                .border_1()
+                                .border_color(if on { theme::on_active().opacity(0.4) } else { theme::border() })
+                                .child(t.key()),
+                        )
+                        .on_click(cx.listener(move |v, _, window, cx| {
+                            v.ed.set_tool(t);
+                            v.tool_menu = None;
+                            window.focus(&v.canvas_focus, cx);
+                            cx.notify();
+                        })),
+                ),
             );
         }
         div()
@@ -762,7 +778,8 @@ impl EditorView {
                         }),
                     ),
             )
-            .child(menu)
+            // Keyed by group: switching flyouts plays again.
+            .child(Enter::menu(From::Left).run(("tool-flyout-enter", gi), menu))
     }
 
     /// Layers card (left, top, width, height in window coordinates): at
@@ -783,7 +800,7 @@ impl EditorView {
         (left, window_h - M - h, LAYERS_W, h)
     }
 
-    fn layers_card(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn layers_card(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Div {
         let (left, _, _, h) = self.layers_frame(window);
         v_flex()
             .occlude()
@@ -813,8 +830,15 @@ impl EditorView {
         let right = M + PANEL_W + 8.0 + VIEW_PILL_W.max(if self.frames().is_empty() { 0.0 } else { FRAME_W }) + M;
         v_flex().absolute().bottom(px(M)).left(px(left)).right(px(right)).gap_2().items_center().children(
             self.notice.as_ref().map(|(msg, err)| {
+                // Each new message rises again.
+                let key = {
+                    use std::hash::{Hash, Hasher};
+                    let mut h = std::collections::hash_map::DefaultHasher::new();
+                    msg.hash(&mut h);
+                    h.finish() as usize
+                };
                 // Material snackbar: inverse surface (or error container).
-                div()
+                let bar = div()
                     .occlude()
                     .max_w(px(560.0))
                     .px_4()
@@ -824,7 +848,8 @@ impl EditorView {
                     .text_sm()
                     .bg(if *err { theme::danger_container() } else { theme::text() })
                     .text_color(if *err { rgb(0xffdad6).into() } else { theme::on_surface_inverse() })
-                    .child(msg.clone())
+                    .child(msg.clone());
+                Enter::card(From::Below).run(("snackbar", key), bar)
             }),
         )
     }
@@ -997,14 +1022,16 @@ impl Render for EditorView {
             // Leaving the bar forgets its open menu.
             self.quick.menu = None;
         }
+        // Opening a project: the surfaces glide in from their edges, one
+        // after the other.
         root.child(middle)
             .child(self.bottom_strip(window, effects_shown))
-            .child(self.view_pill(cx))
+            .child(Enter::card(From::Below).after(200).run("view-pill-enter", self.view_pill(cx)))
             .children(self.tool_frames(cx))
-            .child(self.top_bar(cx))
-            .child(self.tool_rail(cx))
-            .child(self.right_panel(window, cx))
-            .child(self.layers_card(window, cx))
+            .child(Enter::card(From::Above).flat().run("top-bar-enter", self.top_bar(cx)))
+            .child(Enter::card(From::Left).after(70).run("tool-rail-enter", self.tool_rail(cx)))
+            .child(Enter::card(From::Right).flat().after(110).run("right-panel-enter", self.right_panel(window, cx)))
+            .child(Enter::card(From::Left).after(150).run("layers-enter", self.layers_card(window, cx)))
             .children(effects)
             .children(sel_bar)
             .children(flyout)

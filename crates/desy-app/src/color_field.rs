@@ -77,7 +77,10 @@ impl EditorView {
             .w(px(300.0))
             .on_open_change(move |open, _, cx| st.update(cx, |s, cx| s.set_open(*open, cx)))
             .trigger(Trigger { value, look, open, tip })
-            .when(open, |p| p.children(extra).child(self.color_panel(state, with_palette, window, cx)))
+            .when(open, |p| {
+                let body = v_flex().children(extra).child(self.color_panel(state, with_palette, window, cx));
+                p.child(crate::motion::Enter::content().wrap("color-field-enter", body))
+            })
     }
 
     fn color_panel(
