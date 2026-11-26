@@ -2,6 +2,7 @@
 //! image actions. Its entries depend on the selection.
 
 use crate::icons::{Icon, icon};
+use crate::motion::{Enter, From};
 use crate::theme;
 use crate::view::EditorView;
 use desy_core::{BoolOp, Shape};
@@ -126,29 +127,32 @@ impl EditorView {
             menu = match e {
                 Entry::Separator => menu.child(div().h(px(1.0)).my(px(4.0)).mx_2().flex_none().bg(theme::border())),
                 Entry::Item { icon: ic, label, keys, enabled, run } => menu.child(
-                    div()
-                        .id(("ctx-item", i))
-                        .h(px(ITEM_H))
-                        .flex()
-                        .flex_none()
-                        .items_center()
-                        .gap_3()
-                        .px_3()
-                        .rounded(px(10.0))
-                        .when(!enabled, |d| d.opacity(0.38))
-                        .when(enabled, |d| {
-                            d.hover(|d| d.bg(theme::hover())).active(|d| d.bg(theme::pressed())).on_click(cx.listener(
-                                move |v, _, window, cx| {
-                                    v.context_menu = None;
-                                    run(v, window, cx);
-                                    window.focus(&v.canvas_focus, cx);
-                                    v.after_edit(cx);
-                                },
-                            ))
-                        })
-                        .child(icon(ic, 18.0, theme::text_dim()))
-                        .child(div().flex_1().text_sm().child(label))
-                        .child(div().text_xs().text_color(theme::text_faint()).child(keys)),
+                    Enter::row(i).wrap(
+                        ("ctx-row", i),
+                        div()
+                            .id(("ctx-item", i))
+                            .h(px(ITEM_H))
+                            .flex()
+                            .flex_none()
+                            .items_center()
+                            .gap_3()
+                            .px_3()
+                            .rounded(px(10.0))
+                            .when(!enabled, |d| d.opacity(0.38))
+                            .when(enabled, |d| {
+                                d.hover(|d| d.bg(theme::hover())).active(|d| d.bg(theme::pressed())).on_click(
+                                    cx.listener(move |v, _, window, cx| {
+                                        v.context_menu = None;
+                                        run(v, window, cx);
+                                        window.focus(&v.canvas_focus, cx);
+                                        v.after_edit(cx);
+                                    }),
+                                )
+                            })
+                            .child(icon(ic, 18.0, theme::text_dim()))
+                            .child(div().flex_1().text_sm().child(label))
+                            .child(div().text_xs().text_color(theme::text_faint()).child(keys)),
+                    ),
                 ),
             };
         }
@@ -175,7 +179,7 @@ impl EditorView {
                         .on_mouse_down(MouseButton::Left, cx.listener(close))
                         .on_mouse_down(MouseButton::Right, cx.listener(close)),
                 )
-                .child(menu)
+                .child(Enter::menu(From::Above).run("context-menu-enter", menu))
                 .into_any_element(),
         )
     }

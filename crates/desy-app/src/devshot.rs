@@ -452,7 +452,9 @@ pub fn open_fill_picker(v: &mut EditorView, cx: &mut gpui_kit::Context<EditorVie
 pub fn schedule(path: String, window: &mut Window, cx: &mut App) {
     window
         .spawn(cx, async move |cx| {
-            cx.background_executor().timer(std::time::Duration::from_millis(1500)).await;
+            // `DESY_SHOT_MS`: capture earlier, e.g. mid entrance motion.
+            let ms = std::env::var("DESY_SHOT_MS").ok().and_then(|v| v.parse().ok()).unwrap_or(1500);
+            cx.background_executor().timer(std::time::Duration::from_millis(ms)).await;
             let _ = cx.update(|window, cx| {
                 window.refresh();
                 match window.render_to_image() {

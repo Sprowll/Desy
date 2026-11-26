@@ -10,6 +10,7 @@
 use crate::color_field::FieldLook;
 use crate::editor::{Align, Drag, Editor, HANDLE_RADIUS, Tool};
 use crate::icons::{Icon, icon};
+use crate::motion::{Enter, From};
 use crate::panels::{PickerKind, chip};
 use crate::theme;
 use crate::view::{EditorView, floating};
@@ -286,20 +287,21 @@ impl EditorView {
             x = layers_right;
         }
 
-        Some(
-            floating()
-                .id("quick-bar")
-                .absolute()
-                .left(px(x as f32))
-                .top(px(y as f32))
-                .h(px(BAR_H))
-                .px(px(BAR_PAD))
-                .gap(px(ITEM_GAP))
-                .rounded_full()
-                .bg(theme::panel_high())
-                .children(items.into_iter().map(|(e, _)| e))
-                .into_any_element(),
-        )
+        let bar = floating()
+            .id("quick-bar")
+            .absolute()
+            .left(px(x as f32))
+            .top(px(y as f32))
+            .h(px(BAR_H))
+            .px(px(BAR_PAD))
+            .gap(px(ITEM_GAP))
+            .rounded_full()
+            .bg(theme::panel_high())
+            .children(items.into_iter().map(|(e, _)| e));
+        // Pops back after each drag, rising towards the selection when
+        // the bar sits above it.
+        let from = if y < tl.y { From::Below } else { From::Above };
+        Some(Enter::menu(from).run("quick-bar-enter", bar).into_any_element())
     }
 
     /// "None" chip at the top of the quick stroke popover; toggles the stroke.
@@ -338,7 +340,10 @@ impl EditorView {
                 });
             })
             .trigger(MenuTrigger { menu, open })
-            .when(open, |p| p.w(px(menu.popover_w())).child(self.menu_body(menu, cx)))
+            .when(open, |p| {
+                p.w(px(menu.popover_w()))
+                    .child(Enter::content().wrap(("quick-menu-enter", menu as usize), self.menu_body(menu, cx)))
+            })
             .into_any_element()
     }
 

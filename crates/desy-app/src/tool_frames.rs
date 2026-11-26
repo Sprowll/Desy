@@ -6,6 +6,7 @@
 
 use crate::editor::{Editor, Tool};
 use crate::icons::{Icon, icon};
+use crate::motion::{Enter, From};
 use crate::panels::info;
 use crate::theme;
 use crate::view::{EditorView, FRAMES_BOTTOM, M, PANEL_W};
@@ -145,11 +146,13 @@ impl EditorView {
                 .border_color(theme::border())
                 .shadow_lg()
                 .child(header);
-            col = col.child(if collapsed {
+            let card = if collapsed {
                 card.rounded_full()
             } else {
                 card.w_full().rounded(px(20.0)).pb_3().child(self.frame_body(frame, cx))
-            });
+            };
+            col =
+                col.child(Enter::card(From::Right).run(ElementId::Name(format!("{}-enter", frame.id()).into()), card));
         }
         Some(col.into_any_element())
     }
