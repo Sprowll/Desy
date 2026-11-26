@@ -1,0 +1,80 @@
+name: Version
+
+# Actions → Version → Run workflow: bumps the version in Cargo.toml (SemVer),
+# commits it, tags vX.Y.Z, then builds and publishes the release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Which part of the version to increase
+        type: choice
+        options: [patch, minor, major]
+        default: patch
+      prerelease:
+        description: Optional pre-release suffix (e.g. beta.1), empty for a stable release
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: version
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  bump:
+    name: Bump version and tag
+    needs: test
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # push the version commit and the tag
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+    env:
+      BUMP: ${{ inputs.bump }}
+      PRE: ${{ inputs.prerelease }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+      - id: bump
+        name: Bump
+        run: |
+          [[ -z "$PRE" || "$PRE" =~ ^[0-9A-Za-z.]+$ ]] || { echo "::error::Invalid pre-release suffix"; exit 1; }
+          current=$(grep -m1 -E '^version = ' Cargo.toml | cut -d'"' -f2)
+          IFS=. read -r major minor patch <<< "${current%%-*}"
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) [[ "$current" == *-* ]] || patch=$((patch + 1)) ;;
+          esac
+          next="$major.$minor.$patch${PRE:+-$PRE}"
+          if git rev-parse -q --verify "refs/tags/v$next" >/dev/null; then
+            echo "::error::Tag v$next already exists"; exit 1
+          fi
+          sed -i -E "0,/^version = \"[^\"]+\"/s//version = \"$next\"/" Cargo.toml
+          cargo update --workspace
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore(release): v$next"
+          git tag -a "v$next" -m "Desy v$next"
+          git push origin HEAD:main "v$next"
+          echo "tag=v$next" >> "$GITHUB_OUTPUT"
+          echo "Version $current → $next" >> "$GITHUB_STEP_SUMMARY"
+
+  release:
+    needs: bump
+    uses: ./.github/workflows/release.yml
+    with:
+      tag: ${{ needs.bump.outputs.tag }}
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write

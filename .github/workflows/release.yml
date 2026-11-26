@@ -1,0 +1,146 @@
+name: Release
+
+# Builds Desy for macOS, Linux and Windows and publishes a GitHub Release.
+# Runs on a pushed `vX.Y.Z` tag, or is called by the "Version" workflow.
+
+on:
+  push:
+    tags: ["v*.*.*"]
+  workflow_call:
+    inputs:
+      tag:
+        description: Tag to release (vX.Y.Z)
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  check:
+    name: Check version
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+      - id: v
+        name: Tag matches Cargo.toml
+        run: |
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]] || { echo "::error::Invalid tag $TAG"; exit 1; }
+          version=$(grep -m1 -E '^version = ' Cargo.toml | cut -d'"' -f2)
+          if [ "v$version" != "$TAG" ]; then
+            echo "::error::Tag $TAG does not match Cargo.toml version $version"
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build ${{ matrix.name }}
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: macos-arm64, os: macos-latest, target: aarch64-apple-darwin }
+          - { name: macos-x86_64, os: macos-latest, target: x86_64-apple-darwin }
+          - { name: linux-x86_64, os: ubuntu-22.04, target: x86_64-unknown-linux-gnu }
+          - { name: windows-x86_64, os: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      TARGET: ${{ matrix.target }}
+      NAME: ${{ matrix.name }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.TAG }}
+          persist-credentials: false
+      - name: Linux dependencies
+        if: runner.os == 'Linux'
+        run: ./.github/scripts/linux-deps.sh
+      - uses: dtolnay/rust-toolchain@39008827e6b4319a349e9a42dfc90579dd25f1ca # stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+      - name: Build
+        shell: bash
+        run: cargo build --release --locked -p desy --target "$TARGET"
+
+      - name: Package (macOS .dmg)
+        if: runner.os == 'macOS'
+        run: |
+          cargo install cargo-bundle --locked
+          cargo bundle --release -p desy --target "$TARGET"
+          app="target/$TARGET/release/bundle/osx/Desy.app"
+          # Ad-hoc signature: required to run on Apple Silicon (not notarized).
+          codesign --force --deep --sign - "$app"
+          mkdir -p staging dist
+          cp -R "$app" staging/
+          ln -s /Applications staging/Applications
+          hdiutil create -volname "Desy" -srcfolder staging -ov -format UDZO "dist/Desy-$VERSION-$NAME.dmg"
+
+      - name: Package (Linux .tar.gz)
+        if: runner.os == 'Linux'
+        run: |
+          dir="desy-$VERSION-$NAME"
+          mkdir -p "$dir" dist
+          cp "target/$TARGET/release/desy" "$dir/"
+          cp assets/linux/desy.desktop "$dir/"
+          cp assets/icon.png "$dir/desy.png"
+          cp LICENSE.md README.md "$dir/"
+          tar -czf "dist/$dir.tar.gz" "$dir"
+
+      - name: Package (Windows .zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "desy-$env:VERSION-$env:NAME"
+          New-Item -ItemType Directory -Force -Path $dir, dist | Out-Null
+          Copy-Item "target/$env:TARGET/release/desy.exe", LICENSE.md, README.md -Destination $dir
+          Compress-Archive -Path $dir -DestinationPath "dist/$dir.zip"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desy-${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: Publish GitHub Release
+    needs: [check, build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write # create the release
+      id-token: write # sign the build provenance
+      attestations: write
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desy-*
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        working-directory: dist
+        run: sha256sum -- * > SHA256SUMS.txt && cat SHA256SUMS.txt
+      - name: Build provenance
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: dist/*
+      - name: Create release
+        run: |
+          flags=()
+          [[ "$TAG" == *-* ]] && flags+=(--prerelease)
+          gh release create "$TAG" dist/* --verify-tag --title "Desy $VERSION" --generate-notes "${flags[@]}"
