@@ -1397,7 +1397,7 @@ name = "desy-core"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "base64 0.22.1",
+ "base64 0.23.1",
  "fontdb 0.24.0",
  "kurbo 0.13.1",
  "linesweeper",
